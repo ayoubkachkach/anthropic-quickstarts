@@ -22,6 +22,7 @@ from anthropic.types.beta import (
     BetaTextBlockParam,
     BetaToolResultBlockParam,
 )
+from redis_utils import publish, start_redis_listener
 from streamlit.delta_generator import DeltaGenerator
 
 from computer_use_demo.loop import (
@@ -62,7 +63,16 @@ class Sender(StrEnum):
     TOOL = "tool"
 
 
+def reset_state():
+    st.session_state.messages = []
+    st.session_state.responses = {}
+    st.session_state.tools = {}
+    st.session_state.in_sampling_loop = False
+
+
 def setup_state():
+    if "listener_started" not in st.session_state:
+        st.session_state.listener_started = False
     if "messages" not in st.session_state:
         st.session_state.messages = []
     if "api_key" not in st.session_state:
@@ -100,9 +110,25 @@ def _reset_model():
     ]
 
 
+def on_message(message):
+    # Re-enable if we want to reset the state at every message.
+    # reset_state()
+    st.session_state.messages = [
+        {
+            "role": Sender.USER,
+            "content": [
+                *maybe_add_interruption_blocks(),
+                BetaTextBlockParam(type="text", text=message),
+            ],
+        }
+    ]
+    _render_message(Sender.USER, message)
+
+
 async def main():
     """Render loop for streamlit"""
     setup_state()
+    start_redis_listener(st.session_state, on_message=on_message)
 
     st.markdown(STREAMLIT_STYLE, unsafe_allow_html=True)
 
@@ -218,7 +244,8 @@ async def main():
         except IndexError:
             return
 
-        if most_recent_message["role"] is not Sender.USER:
+        if most_recent_message["role"] != Sender.USER:
+            print(f"Exited early: {most_recent_message}")
             # we don't have a user message to respond to, exit early
             return
 
@@ -241,6 +268,8 @@ async def main():
                 api_key=st.session_state.api_key,
                 only_n_most_recent_images=st.session_state.only_n_most_recent_images,
             )
+            last_message = st.session_state.messages[-1]
+            publish(last_message["content"][0]["text"])
 
 
 def maybe_add_interruption_blocks():

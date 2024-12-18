@@ -1,0 +1,35 @@
+services:
+  computeruse-app:
+    build:
+      context: .  # Assuming your Dockerfile is in the current directory
+    container_name: computeruse-app
+    environment:
+      - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY}
+    volumes:
+      - ${HOME}/.anthropic:/home/computeruse/.anthropic
+      - ./computer_use_demo:/home/computeruse/computer_use_demo
+      - ./image:/home/computeruse/image
+    ports:
+      - "5900:5900"  # VNC Port
+      - "8501:8501"  # Streamlit
+      - "6080:6080"
+      - "8080:8080"
+    networks:
+      - app-network
+    depends_on:
+      - redis
+    stdin_open: true
+    tty: true
+
+  # Official Redis container
+  redis:
+    image: redis:latest
+    container_name: redis
+    ports:
+      - "6379:6379"  # Redis default port
+    networks:
+      - app-network
+
+networks:
+  app-network:
+    driver: bridge

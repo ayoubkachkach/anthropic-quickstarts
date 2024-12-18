@@ -9,7 +9,7 @@ from computer_use_demo.streamlit import Sender
 
 @pytest.fixture
 def streamlit_app():
-    return AppTest.from_file("computer_use_demo/streamlit.py")
+    return AppTest.from_file("computer_use_demo/app.py")
 
 
 def test_streamlit(streamlit_app: AppTest):
